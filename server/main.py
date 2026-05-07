@@ -3,6 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from pydantic import BaseModel
 from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from datetime import datetime, timedelta
+import uuid
+
+# In-memory store for restocking orders (clears on restart)
+restock_orders: list = []
 
 app = FastAPI(title="Factory Inventory Management System")
 
@@ -89,6 +94,26 @@ class DemandForecast(BaseModel):
     forecasted_demand: int
     trend: str
     period: str
+    unit_cost: float
+
+class RestockOrderItem(BaseModel):
+    item_sku: str
+    item_name: str
+    quantity: int
+    unit_cost: float
+    total_cost: float
+
+class RestockOrder(BaseModel):
+    id: str
+    items: List[RestockOrderItem]
+    total_cost: float
+    submitted_date: str
+    expected_delivery: str
+    status: str
+
+class CreateRestockOrderRequest(BaseModel):
+    items: List[RestockOrderItem]
+    total_cost: float
 
 class BacklogItem(BaseModel):
     id: str
@@ -303,6 +328,26 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/restock/orders", response_model=List[RestockOrder])
+def get_restock_orders():
+    """Get all submitted restocking orders"""
+    return restock_orders
+
+@app.post("/api/restock/orders", response_model=RestockOrder)
+def create_restock_order(body: CreateRestockOrderRequest):
+    """Submit a new restocking order"""
+    order_date = datetime.utcnow()
+    new_order = RestockOrder(
+        id=f"RST-{str(uuid.uuid4())[:8].upper()}",
+        items=body.items,
+        total_cost=body.total_cost,
+        submitted_date=order_date.isoformat(),
+        expected_delivery=(order_date + timedelta(days=7)).isoformat(),
+        status="Submitted"
+    )
+    restock_orders.append(new_order.dict())
+    return new_order
 
 if __name__ == "__main__":
     import uvicorn

@@ -8,6 +8,35 @@
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else>
+      <!-- Submitted Restocking Orders -->
+      <div v-if="restockOrders.length > 0" class="card" style="margin-bottom:1.25rem">
+        <div class="card-header">
+          <h3 class="card-title">Submitted Restocking Orders ({{ restockOrders.length }})</h3>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Items</th>
+              <th>Total Cost</th>
+              <th>Submitted</th>
+              <th>Expected Delivery</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="order in restockOrders" :key="order.id">
+              <td><strong>{{ order.id }}</strong></td>
+              <td>{{ order.items.length }} item(s)</td>
+              <td><strong>${{ order.total_cost.toLocaleString() }}</strong></td>
+              <td>{{ formatDate(order.submitted_date) }}</td>
+              <td>{{ formatDate(order.expected_delivery) }}</td>
+              <td><span class="badge info">{{ order.status }}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="stats-grid">
         <div class="stat-card success">
           <div class="stat-label">{{ t('status.delivered') }}</div>
@@ -95,6 +124,7 @@ export default {
     const loading = ref(true)
     const error = ref(null)
     const orders = ref([])
+    const restockOrders = ref([])
 
     // Use shared filters
     const {
@@ -121,6 +151,14 @@ export default {
         error.value = 'Failed to load orders: ' + err.message
       } finally {
         loading.value = false
+      }
+    }
+
+    const loadRestockOrders = async () => {
+      try {
+        restockOrders.value = await api.getRestockOrders()
+      } catch (err) {
+        console.error('Failed to load restock orders:', err)
       }
     }
 
@@ -153,7 +191,7 @@ export default {
       })
     }
 
-    onMounted(loadOrders)
+    onMounted(() => { loadOrders(); loadRestockOrders() })
 
     return {
       t,
@@ -165,7 +203,8 @@ export default {
       formatDate,
       currencySymbol,
       translateProductName,
-      translateCustomerName
+      translateCustomerName,
+      restockOrders
     }
   }
 }
